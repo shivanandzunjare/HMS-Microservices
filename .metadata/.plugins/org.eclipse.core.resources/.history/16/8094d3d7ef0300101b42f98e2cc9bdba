@@ -1,0 +1,5 @@
+package com.cws.config;
+
+public class SecurityConfig {
+
+}

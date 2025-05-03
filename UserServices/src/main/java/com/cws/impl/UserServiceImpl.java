@@ -1,0 +1,93 @@
+package com.cws.impl;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+//import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestTemplate;
+
+import com.cws.entities.Hotel;
+import com.cws.entities.Rating;
+import com.cws.entities.User;
+import com.cws.exceptions.ResourceNotFoundException;
+import com.cws.external.service.HotelService;
+import com.cws.repo.UserRepo;
+import com.cws.services.UserService;
+
+import jakarta.transaction.Transactional;
+
+@Service
+@Transactional
+public class UserServiceImpl implements UserService{
+	
+	@Autowired
+	private UserRepo userRepo;
+	
+	@Autowired
+	private RestTemplate restTemplate;
+	
+	@Autowired
+	private HotelService hotelService;
+	
+	private Logger logger = LoggerFactory.getLogger(UserServiceImpl.class);
+	
+
+	@Override
+	public User saveUser(User user) {
+		//generate unique userid 
+		String randomUserId = UUID.randomUUID().toString();
+		user.setUserid(randomUserId);
+		return userRepo.save(user);
+	}
+
+	@Override
+	public List<User> getAllUser() {
+		return userRepo.findAll();
+	}
+
+	@Override
+	public User getUser(String userid) {
+		//get user from database with the help of user repository
+		
+		User user = userRepo.findById(userid).orElseThrow(() -> new ResourceNotFoundException(" User with given id is not found on server  " + userid));
+        Rating[] ratingOfUser = restTemplate.getForObject( "http://RATING-SERVICE/ratings/users/"+user.getUserid(), Rating[].class);
+		logger.info("{}", ratingOfUser);
+		
+		List<Rating> ratings = Arrays.stream(ratingOfUser).toList();
+		//api call to hotel service to get the hotel
+		List<Rating> ratingList = ratings.stream().map(rating ->{
+			
+			//http://localhost:8081/hotels/34b8fce5-09e5-4cfd-a412-1ba99c849ab0
+//			ResponseEntity<Hotel> forEntity = restTemplate.getForEntity("http://HOTEL-SERVICE/hotels/"+rating.getHotelid(), Hotel.class);
+//			Hotel hotel = forEntity.getBody();
+			
+			Hotel hotel = hotelService.getHotel(rating.getHotelid());
+			
+			//logger.info("response status code : {}", forEntity.getStatusCode());
+			
+			//set the hotel to rating
+			rating.setHotel(hotel);
+			
+			return rating;
+			
+		}).collect(Collectors.toList());
+		
+		user.setRatings(ratingList);
+		
+        return user;
+		
+		//fetch rating of the above user from  rating service
+		
+		//http://localhost:8082/ratings/users/f29565bf-8007-491d-a26b-6cc34df083d4
+		//to call http service use rest TEmplate
+	}
+
+}

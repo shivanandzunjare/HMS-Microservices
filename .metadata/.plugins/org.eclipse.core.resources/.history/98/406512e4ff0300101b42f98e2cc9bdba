@@ -1,0 +1,12 @@
+package com.cws.models;
+
+public class AuthResponse {
+	private String userid;
+	
+	private String accessToken;
+	
+	private String refreshToken;
+	
+	private long expireAt;
+	
+}
